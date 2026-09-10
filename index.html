@@ -11,11 +11,33 @@
 
         .header-area { text-align: center; width: 100%; max-width: 600px; margin-bottom: 20px; }
         .header-area h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
-        .header-area p { font-size: 13px; color: #64748b; word-break: keep-all; }
+        .header-area p { font-size: 13px; color: #64748b; word-break: keep-all; margin-bottom: 16px; }
+
+        /* 최상단 투표 진행 현황 UI 카드 */
+        .vote-progress-card {
+            background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px;
+            padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            text-align: left; margin-bottom: 8px;
+        }
+
+        .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .progress-title { font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 4px; }
+        .progress-stats { font-size: 14px; font-weight: 800; color: #2563eb; }
+        .progress-percent { font-size: 15px; font-weight: 800; color: #0284c7; }
+
+        .total-progress-track {
+            width: 100%; height: 10px; background-color: #f1f5f9;
+            border-radius: 999px; overflow: hidden;
+        }
+
+        .total-progress-bar {
+            height: 100%; background: linear-gradient(90deg, #3b82f6 0%, #0284c7 100%);
+            width: 0%; transition: width 0.4s ease; border-radius: 999px;
+        }
 
         .admin-dashboard-header {
             display: none; background: #0f172a; color: #38bdf8; padding: 10px 16px;
-            border-radius: 10px; margin-top: 12px; font-size: 13px; font-weight: 700;
+            border-radius: 10px; margin-top: 12px; font-size: 13px; font-weight: 700; text-align: center;
         }
 
         .card-grid {
@@ -44,15 +66,13 @@
 
         .img-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 돋보기 버튼 스타일 */
         .zoom-btn {
             position: absolute; top: 8px; right: 8px;
             background: rgba(15, 23, 42, 0.7); color: #ffffff;
             width: 32px; height: 32px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 14px; border: none; cursor: pointer;
-            backdrop-filter: blur(4px); z-index: 5;
-            transition: background 0.2s, transform 0.2s;
+            backdrop-filter: blur(4px); z-index: 5; transition: background 0.2s, transform 0.2s;
         }
 
         .zoom-btn:active { transform: scale(0.9); background: rgba(37, 99, 235, 0.9); }
@@ -65,7 +85,6 @@
         .progress-track { width: 100%; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden; display: none; margin-top: 3px; }
         .progress-bar { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
 
-        /* 하단 고정 버튼 */
         .bottom-action {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
@@ -89,7 +108,6 @@
         .admin-controls { display: flex; gap: 12px; }
         .admin-btn { font-size: 11px; color: #94a3b8; background: none; border: none; cursor: pointer; text-decoration: underline; }
 
-        /* 이미지 원본 모달 팝업 */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(15, 23, 42, 0.9); z-index: 1000;
@@ -107,9 +125,7 @@
             border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
 
-        .modal-title {
-            color: #ffffff; font-size: 18px; font-weight: 700; margin-top: 12px; text-align: center;
-        }
+        .modal-title { color: #ffffff; font-size: 18px; font-weight: 700; margin-top: 12px; text-align: center; }
 
         .modal-close {
             position: absolute; top: -45px; right: 0;
@@ -126,6 +142,21 @@
     <div class="header-area">
         <h1>🎨 인생그래프 베스트 투표</h1>
         <p>인생그래프를 확인한 후, 가장 인상 깊은 1명에게 투표해 주세요! (기기당 1회)</p>
+        
+        <!-- 최상단 전체 투표 진행률 카드 (28명 기준) -->
+        <div class="vote-progress-card">
+            <div class="progress-header">
+                <span class="progress-title">📈 투표 진행 현황</span>
+                <div>
+                    <span class="progress-stats" id="progressStats">0 / 28명</span>
+                    <span class="progress-percent" id="progressPercent">(0%)</span>
+                </div>
+            </div>
+            <div class="total-progress-track">
+                <div class="total-progress-bar" id="totalProgressBar"></div>
+            </div>
+        </div>
+
         <div class="admin-dashboard-header" id="adminHeader">🔒 관리자 모드: 실시간 집계 현황 공개 중</div>
     </div>
 
@@ -141,7 +172,6 @@
         </div>
     </div>
 
-    <!-- 이미지 확대 모달 -->
     <div class="modal-overlay" id="imageModal" onclick="closeModal()">
         <div class="modal-container" onclick="event.stopPropagation()">
             <button class="modal-close" onclick="closeModal()">✕</button>
@@ -152,13 +182,16 @@
 
 <script>
     const ADMIN_PASSWORD = "1001";
+    const TOTAL_TARGET_VOTERS = 28; // 총 투표 목표 인원수 (28명)
 
+    // 참가자 총 28명 명단 (가나다순 정렬)
     const memberNames = [
         "강민석", "권성현", "김리아", "김보민", "김예린", 
         "김은아", "김재광", "김주연", "김채은", "김혜정", 
         "김호균", "맹원영", "박민지", "박진선", "서지우", 
         "이가연", "이민주", "이상원", "이슬비", "이정근", 
-        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영"
+        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영",
+        "참가자27", "참가자28"
     ].sort((a, b) => a.localeCompare(b, 'ko'));
 
     let selectedId = null;
@@ -174,7 +207,7 @@
     }
 
     function getStorageData() {
-        const saved = localStorage.getItem('workshop_vote_candidates_v10');
+        const saved = localStorage.getItem('workshop_vote_candidates_v12');
         if (saved) return JSON.parse(saved);
 
         return memberNames.map((name, idx) => ({
@@ -188,7 +221,7 @@
     function checkHasVoted() {
         const deviceId = getDeviceId();
         const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v10') === 'true';
+        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v12') === 'true';
     }
 
     function renderView() {
@@ -199,6 +232,12 @@
         const votedNotice = document.getElementById('votedNotice');
         const adminHeader = document.getElementById('adminHeader');
         const hasVoted = checkHasVoted();
+
+        // 최상단 진행률 UI 업데이트 (28명 기준 계산)
+        const progressPercent = Math.min(Math.round((totalVotes / TOTAL_TARGET_VOTERS) * 100), 100);
+        document.getElementById('progressStats').textContent = `${totalVotes} / ${TOTAL_TARGET_VOTERS}명`;
+        document.getElementById('progressPercent').textContent = `(${progressPercent}%)`;
+        document.getElementById('totalProgressBar').style.width = `${progressPercent}%`;
 
         adminHeader.style.display = isAdminMode ? 'block' : 'none';
         cardGrid.innerHTML = '';
@@ -266,8 +305,8 @@
             votedDevices.push(deviceId);
             
             localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
-            localStorage.setItem('workshop_vote_candidates_v10', JSON.stringify(list));
-            localStorage.setItem('workshop_vote_done_v10', 'true');
+            localStorage.setItem('workshop_vote_candidates_v12', JSON.stringify(list));
+            localStorage.setItem('workshop_vote_done_v12', 'true');
             
             selectedId = null;
             renderView();
@@ -295,8 +334,8 @@
         const inputPw = prompt("데이터를 초기화하려면 관리자 비밀번호를 입력하세요:");
         if (inputPw === ADMIN_PASSWORD) {
             if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                localStorage.removeItem('workshop_vote_candidates_v10');
-                localStorage.removeItem('workshop_vote_done_v10');
+                localStorage.removeItem('workshop_vote_candidates_v12');
+                localStorage.removeItem('workshop_vote_done_v12');
                 localStorage.removeItem('workshop_voted_devices');
                 selectedId = null;
                 isAdminMode = false;
@@ -308,7 +347,6 @@
         }
     }
 
-    // 돋보기 모달 열기/닫기
     function openModal(imgSrc, name) {
         const modal = document.getElementById('imageModal');
         const modalImg = document.getElementById('modalImg');
