@@ -10,6 +10,15 @@
         body { background-color: #f8fafc; color: #0f172a; min-height: 100vh; padding: 20px 12px 100px; display: flex; flex-direction: column; align-items: center; }
 
         .header-area { text-align: center; width: 100%; max-width: 600px; margin-bottom: 20px; }
+        
+        /* 최상단 이그니스 로고 스타일 */
+        .brand-logo-container {
+            display: flex; justify-content: center; align-items: center; margin-bottom: 16px;
+        }
+        .brand-logo {
+            height: 32px; width: auto; object-fit: contain;
+        }
+
         .header-area h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
         .header-area p { font-size: 13px; color: #64748b; word-break: keep-all; margin-bottom: 16px; }
 
@@ -140,6 +149,11 @@
 <body>
 
     <div class="header-area">
+        <!-- 최상단 이그니스 로고 영역 -->
+        <div class="brand-logo-container">
+            <img src="./logo.png" alt="EGNIS 로고" class="brand-logo" onerror="if(this.src.endsWith('.png')){this.src='./logo.jpg';}">
+        </div>
+
         <h1>🎨 인생그래프 베스트 투표</h1>
         <p>인생그래프를 확인한 후, 가장 인상 깊은 1명에게 투표해 주세요! (기기당 1회)</p>
         
@@ -182,9 +196,8 @@
 
 <script>
     const ADMIN_PASSWORD = "1001";
-    const TOTAL_TARGET_VOTERS = 28; // 총 투표 인원수 (28명)
+    const TOTAL_TARGET_VOTERS = 28;
 
-    // 실제 참가자 28명 전체 명단 (가나다순 정렬)
     const memberNames = [
         "강민석", "권성현", "김리아", "김미희", "김보민", "김예린", 
         "김은아", "김재광", "김주연", "김채은", "김혜정", 
@@ -232,7 +245,6 @@
         const adminHeader = document.getElementById('adminHeader');
         const hasVoted = checkHasVoted();
 
-        // 최상단 진행률 UI 업데이트 (28명 기준)
         const progressPercent = Math.min(Math.round((totalVotes / TOTAL_TARGET_VOTERS) * 100), 100);
         document.getElementById('progressStats').textContent = `${totalVotes} / ${TOTAL_TARGET_VOTERS}명`;
         document.getElementById('progressPercent').textContent = `(${progressPercent}%)`;
