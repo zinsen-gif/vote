@@ -43,7 +43,6 @@
             border-radius: 10px; margin-top: 12px; font-size: 13px; font-weight: 700; text-align: center;
         }
 
-        /* 관리자용 1, 2, 3등 Top 3 랭킹 디자인 */
         .ranking-section {
             display: none; width: 100%; max-width: 800px; background: #ffffff;
             border: 2px solid #3b82f6; border-radius: 16px; padding: 16px;
@@ -51,7 +50,6 @@
         }
 
         .ranking-title { font-size: 16px; font-weight: 800; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-        
         .ranking-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 
         .rank-card {
@@ -78,7 +76,7 @@
         }
         .rank-img-container img { width: 100%; height: 100%; object-fit: cover; }
 
-        .rank-name { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
+        .rank-name { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; }
         .rank-votes { font-size: 12px; font-weight: 800; color: #2563eb; }
 
         .card-grid {
@@ -119,9 +117,23 @@
         .zoom-btn:active { transform: scale(0.9); background: rgba(37, 99, 235, 0.9); }
 
         .card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
-        .name-row { display: flex; justify-content: space-between; align-items: center; }
+        .name-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+        .name-wrapper { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .name { font-size: 15px; font-weight: 700; color: #0f172a; }
         
+        /* 부서 뱃지 디자인 */
+        .dept-badge {
+            font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+            white-space: nowrap; display: inline-block;
+        }
+        .dept-mkt1 { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .dept-mkt2 { background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .dept-mkt3 { background-color: #fefce8; color: #a16207; border: 1px solid #fef08a; }
+        .dept-pm   { background-color: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; }
+        .dept-md   { background-color: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .dept-biz  { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+        .dept-none { background-color: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
         .votes-info { font-size: 12px; font-weight: 700; color: #2563eb; display: none; }
         .progress-track { width: 100%; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden; display: none; margin-top: 3px; }
         .progress-bar { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
@@ -203,7 +215,6 @@
 
         <div class="admin-dashboard-header" id="adminHeader">🔒 관리자 모드: 실시간 집계 현황 및 Top 3 공개 중</div>
 
-        <!-- Top 3 랭킹 영역 -->
         <div class="ranking-section" id="rankingSection">
             <div class="ranking-title">🏆 현재 실시간 Top 3 랭킹</div>
             <div class="ranking-grid" id="rankingGrid"></div>
@@ -234,16 +245,56 @@
     const ADMIN_PASSWORD = "1001";
     const TOTAL_TARGET_VOTERS = 28;
 
-    const memberNames = [
-        "강민석", "권성현", "김리아", "김미희", "김보민", "김예린", 
-        "김은아", "김재광", "김주연", "김채은", "김혜정", 
-        "김호균", "맹원영", "박민지", "박진선", "서지우", 
-        "이가연", "이민주", "이미연", "이상원", "이슬비", "이정근", 
-        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영"
-    ].sort((a, b) => a.localeCompare(b, 'ko'));
+    // 28명 참가자 및 부서 매핑 데이터
+    const rawMembers = [
+        { name: "김호균", team: "-" },
+        { name: "정기흥", team: "마케팅1팀" },
+        { name: "이정근", team: "마케팅2팀" },
+        { name: "김주연", team: "마케팅3팀" },
+        { name: "김재광", team: "상품기획팀" },
+        { name: "김미희", team: "온라인MD팀" },
+        { name: "박진선", team: "마케팅1팀" },
+        { name: "이상원", team: "마케팅1팀" },
+        { name: "주예진", team: "마케팅1팀" },
+        { name: "김혜정", team: "마케팅2팀" },
+        { name: "최우정", team: "마케팅3팀" },
+        { name: "이미연", team: "마케팅1팀" },
+        { name: "김예린", team: "온라인MD팀" },
+        { name: "홍주영", team: "상품기획팀" },
+        { name: "맹원영", team: "온라인MD팀" },
+        { name: "김채은", team: "마케팅2팀" },
+        { name: "윤수현", team: "사업기획팀" },
+        { name: "강민석", team: "마케팅2팀" },
+        { name: "이슬비", team: "마케팅2팀" },
+        { name: "김보민", team: "마케팅3팀" },
+        { name: "서지우", team: "마케팅1팀" },
+        { name: "이가연", team: "마케팅1팀" },
+        { name: "이민주", team: "마케팅2팀" },
+        { name: "이하은", team: "마케팅1팀" },
+        { name: "김은아", team: "상품기획팀" },
+        { name: "박민지", team: "상품기획팀" },
+        { name: "권성현", team: "사업기획팀" },
+        { name: "김리아", team: "마케팅1팀" }
+    ];
+
+    // 가나다순 정렬
+    const membersData = rawMembers.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
     let selectedId = null;
     let isAdminMode = false;
+
+    // 팀별 뱃지 CSS 클래스 반환
+    function getDeptClass(team) {
+        switch(team) {
+            case "마케팅1팀": return "dept-mkt1";
+            case "마케팅2팀": return "dept-mkt2";
+            case "마케팅3팀": return "dept-mkt3";
+            case "상품기획팀": return "dept-pm";
+            case "온라인MD팀": return "dept-md";
+            case "사업기획팀": return "dept-biz";
+            default: return "dept-none";
+        }
+    }
 
     function getDeviceId() {
         let deviceId = localStorage.getItem('workshop_device_uuid');
@@ -255,13 +306,14 @@
     }
 
     function getStorageData() {
-        const saved = localStorage.getItem('workshop_vote_candidates_v14');
+        const saved = localStorage.getItem('workshop_vote_candidates_v15');
         if (saved) return JSON.parse(saved);
 
-        return memberNames.map((name, idx) => ({
+        return membersData.map((item, idx) => ({
             id: idx + 1,
-            name: name,
-            image: `./${name}.jpg`,
+            name: item.name,
+            team: item.team,
+            image: `./${item.name}.jpg`,
             votes: 0
         }));
     }
@@ -269,7 +321,7 @@
     function checkHasVoted() {
         const deviceId = getDeviceId();
         const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v14') === 'true';
+        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v15') === 'true';
     }
 
     function renderView() {
@@ -291,7 +343,6 @@
         adminHeader.style.display = isAdminMode ? 'block' : 'none';
         rankingSection.style.display = isAdminMode ? 'block' : 'none';
 
-        // Top 3 랭킹 산출 및 렌더링
         if (isAdminMode) {
             const sortedByVotes = [...list].sort((a, b) => b.votes - a.votes);
             const top3 = sortedByVotes.slice(0, 3);
@@ -301,6 +352,7 @@
                 const rankNum = index + 1;
                 const percentage = totalVotes > 0 ? Math.round((item.votes / totalVotes) * 100) : 0;
                 const rankLabels = ["🥇 1위", "🥈 2위", "🥉 3위"];
+                const deptClass = getDeptClass(item.team);
 
                 const rankCard = document.createElement('div');
                 rankCard.className = `rank-card rank-${rankNum}`;
@@ -310,7 +362,10 @@
                         <button class="zoom-btn" onclick="openModal('${item.image}', '${item.name}'); event.stopPropagation();">🔍</button>
                         <img src="${item.image}" alt="${item.name}" onerror="if(this.src.endsWith('.jpg')){this.src='./${item.name}.png';}">
                     </div>
-                    <div class="rank-name">${item.name}</div>
+                    <div class="rank-name">
+                        ${item.name}
+                        <span class="dept-badge ${deptClass}">${item.team}</span>
+                    </div>
                     <div class="rank-votes">${item.votes}표 (${percentage}%)</div>
                 `;
                 rankingGrid.appendChild(rankCard);
@@ -321,6 +376,7 @@
 
         list.forEach(c => {
             const percentage = totalVotes > 0 ? Math.round((c.votes / totalVotes) * 100) : 0;
+            const deptClass = getDeptClass(c.team);
             const card = document.createElement('div');
             card.className = `candidate-card ${selectedId === c.id ? 'selected' : ''}`;
             
@@ -335,7 +391,10 @@
                 </div>
                 <div class="card-body">
                     <div class="name-row">
-                        <span class="name">${c.name}</span>
+                        <div class="name-wrapper">
+                            <span class="name">${c.name}</span>
+                            <span class="dept-badge ${deptClass}">${c.team}</span>
+                        </div>
                         <span class="votes-info" style="display: ${isAdminMode ? 'inline' : 'none'}">${c.votes}표 (${percentage}%)</span>
                     </div>
                     <div class="progress-track" style="display: ${isAdminMode ? 'block' : 'none'}">
@@ -382,8 +441,8 @@
             votedDevices.push(deviceId);
             
             localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
-            localStorage.setItem('workshop_vote_candidates_v14', JSON.stringify(list));
-            localStorage.setItem('workshop_vote_done_v14', 'true');
+            localStorage.setItem('workshop_vote_candidates_v15', JSON.stringify(list));
+            localStorage.setItem('workshop_vote_done_v15', 'true');
             
             selectedId = null;
             renderView();
@@ -411,8 +470,8 @@
         const inputPw = prompt("데이터를 초기화하려면 관리자 비밀번호를 입력하세요:");
         if (inputPw === ADMIN_PASSWORD) {
             if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                localStorage.removeItem('workshop_vote_candidates_v14');
-                localStorage.removeItem('workshop_vote_done_v14');
+                localStorage.removeItem('workshop_vote_candidates_v15');
+                localStorage.removeItem('workshop_vote_done_v15');
                 localStorage.removeItem('workshop_voted_devices');
                 selectedId = null;
                 isAdminMode = false;
