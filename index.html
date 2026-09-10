@@ -44,6 +44,19 @@
 
         .img-container img { width: 100%; height: 100%; object-fit: cover; }
 
+        /* 돋보기 버튼 스타일 */
+        .zoom-btn {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(15, 23, 42, 0.7); color: #ffffff;
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; border: none; cursor: pointer;
+            backdrop-filter: blur(4px); z-index: 5;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .zoom-btn:active { transform: scale(0.9); background: rgba(37, 99, 235, 0.9); }
+
         .card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
         .name-row { display: flex; justify-content: space-between; align-items: center; }
         .name { font-size: 15px; font-weight: 700; color: #0f172a; }
@@ -52,6 +65,7 @@
         .progress-track { width: 100%; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden; display: none; margin-top: 3px; }
         .progress-bar { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
 
+        /* 하단 고정 버튼 */
         .bottom-action {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
@@ -74,6 +88,37 @@
 
         .admin-controls { display: flex; gap: 12px; }
         .admin-btn { font-size: 11px; color: #94a3b8; background: none; border: none; cursor: pointer; text-decoration: underline; }
+
+        /* 이미지 원본 모달 팝업 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.9); z-index: 1000;
+            justify-content: center; align-items: center; padding: 16px;
+            backdrop-filter: blur(5px); animation: fadeIn 0.2s ease;
+        }
+
+        .modal-container {
+            position: relative; max-width: 95%; max-height: 90%;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .modal-img {
+            max-width: 100%; max-height: 80vh; object-fit: contain;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .modal-title {
+            color: #ffffff; font-size: 18px; font-weight: 700; margin-top: 12px; text-align: center;
+        }
+
+        .modal-close {
+            position: absolute; top: -45px; right: 0;
+            background: rgba(255,255,255,0.2); color: #fff;
+            border: none; font-size: 20px; width: 36px; height: 36px;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -96,8 +141,16 @@
         </div>
     </div>
 
+    <!-- 이미지 확대 모달 -->
+    <div class="modal-overlay" id="imageModal" onclick="closeModal()">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <img class="modal-img" id="modalImg" src="" alt="인생그래프 확대">
+            <div class="modal-title" id="modalTitle"></div>
+        </div>
+    </div>
+
 <script>
-    // 관리자 비밀번호 변경 완료: 1001
     const ADMIN_PASSWORD = "1001";
 
     const memberNames = [
@@ -161,7 +214,8 @@
 
             card.innerHTML = `
                 <div class="img-container">
-                    <img src="${c.image}" alt="${c.name}" onerror="if (this.src.endsWith('.jpg')) { this.src='./${c.name}.png'; } else { this.parentElement.innerHTML='<span style=\\'font-weight:bold;color:#94a3b8;font-size:12px;\\'>${c.name}</span>'; }">
+                    <button class="zoom-btn" onclick="openModal('${c.image}', '${c.name}'); event.stopPropagation();" title="확대보기">🔍</button>
+                    <img src="${c.image}" alt="${c.name}" onerror="if (this.src.endsWith('.jpg')) { this.src='./${c.name}.png'; } else { this.parentElement.innerHTML='<button class=\\'zoom-btn\\' onclick=\\'event.stopPropagation();\\'>🔍</button><span style=\\'font-weight:bold;color:#94a3b8;font-size:12px;\\'>${c.name}</span>'; }">
                 </div>
                 <div class="card-body">
                     <div class="name-row">
@@ -252,6 +306,21 @@
         } else if (inputPw !== null) {
             alert("비밀번호가 올바르지 않습니다.");
         }
+    }
+
+    // 돋보기 모달 열기/닫기
+    function openModal(imgSrc, name) {
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+        const modalTitle = document.getElementById('modalTitle');
+        
+        modalImg.src = imgSrc;
+        modalTitle.textContent = `${name} 님의 인생그래프`;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('imageModal').style.display = 'none';
     }
 
     renderView();
