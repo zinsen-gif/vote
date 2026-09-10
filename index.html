@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Pretendard Variable", Pretendard, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #f8fafc; color: #0f172a; min-height: 100vh; padding: 20px 12px 100px; display: flex; flex-direction: column; align-items: center; }
+        body { background-color: #f8fafc; color: #0f172a; min-height: 100vh; padding: 20px 12px 110px; display: flex; flex-direction: column; align-items: center; }
 
         .header-area { text-align: center; width: 100%; max-width: 600px; margin-bottom: 20px; }
         
@@ -98,6 +98,15 @@
         .candidate-card:active { transform: scale(0.98); }
         .candidate-card.selected { border-color: #2563eb; background-color: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
 
+        /* 선택 체크 뱃지 */
+        .select-check-badge {
+            position: absolute; top: 8px; left: 8px;
+            background: #2563eb; color: #ffffff; font-size: 11px; font-weight: 800;
+            padding: 3px 8px; border-radius: 999px; display: none; z-index: 5;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+        }
+        .candidate-card.selected .select-check-badge { display: block; }
+
         .img-container {
             width: 100%; aspect-ratio: 4 / 3; background-color: #f1f5f9; position: relative; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
@@ -121,7 +130,6 @@
         .name-wrapper { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .name { font-size: 15px; font-weight: 700; color: #0f172a; }
         
-        /* 부서 뱃지 디자인 */
         .dept-badge {
             font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
             white-space: nowrap; display: inline-block;
@@ -198,7 +206,7 @@
         </div>
 
         <h1>🎨 인생그래프 베스트 투표</h1>
-        <p>인생그래프를 확인한 후, 가장 인상 깊은 1명에게 투표해 주세요! (기기당 1회)</p>
+        <p>인생그래프를 확인한 후, 인상 깊은 <b>2명</b>을 선택해 투표해 주세요! (기기당 1회)</p>
         
         <div class="vote-progress-card">
             <div class="progress-header">
@@ -225,7 +233,7 @@
 
     <div class="bottom-action">
         <div class="voted-notice" id="votedNotice">이 기기에서는 이미 투표를 완료하셨습니다.</div>
-        <button class="btn-vote" id="voteButton" onclick="handleVote()" disabled>후보를 선택해 주세요</button>
+        <button class="btn-vote" id="voteButton" onclick="handleVote()" disabled>후보 2명을 선택해 주세요 (0/2)</button>
         
         <div class="admin-controls">
             <button class="admin-btn" onclick="toggleAdminMode()">관리자 결과 보기</button>
@@ -244,8 +252,8 @@
 <script>
     const ADMIN_PASSWORD = "1001";
     const TOTAL_TARGET_VOTERS = 28;
+    const MAX_SELECTION = 2; // 인당 최대 2명 선택
 
-    // 28명 참가자 및 부서 매핑 데이터
     const rawMembers = [
         { name: "김호균", team: "-" },
         { name: "정기흥", team: "마케팅1팀" },
@@ -277,13 +285,12 @@
         { name: "김리아", team: "마케팅1팀" }
     ];
 
-    // 가나다순 정렬
-    const membersData = rawMembers.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    const membersData = rawMembers.sort((a, b) => a.name.localeCompare(b, 'ko'));
 
-    let selectedId = null;
+    // 다중 선택(최대 2개)을 위한 배열
+    let selectedIds = [];
     let isAdminMode = false;
 
-    // 팀별 뱃지 CSS 클래스 반환
     function getDeptClass(team) {
         switch(team) {
             case "마케팅1팀": return "dept-mkt1";
@@ -306,7 +313,7 @@
     }
 
     function getStorageData() {
-        const saved = localStorage.getItem('workshop_vote_candidates_v15');
+        const saved = localStorage.getItem('workshop_vote_candidates_v16');
         if (saved) return JSON.parse(saved);
 
         return membersData.map((item, idx) => ({
@@ -321,12 +328,16 @@
     function checkHasVoted() {
         const deviceId = getDeviceId();
         const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v15') === 'true';
+        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v16') === 'true';
     }
 
     function renderView() {
         const list = getStorageData();
-        const totalVotes = list.reduce((acc, curr) => acc + curr.votes, 0);
+        
+        // 제출 참여 기기 수 계산
+        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
+        const currentVoterCount = votedDevices.length;
+
         const cardGrid = document.getElementById('cardGrid');
         const voteBtn = document.getElementById('voteButton');
         const votedNotice = document.getElementById('votedNotice');
@@ -335,8 +346,8 @@
         const rankingGrid = document.getElementById('rankingGrid');
         const hasVoted = checkHasVoted();
 
-        const progressPercent = Math.min(Math.round((totalVotes / TOTAL_TARGET_VOTERS) * 100), 100);
-        document.getElementById('progressStats').textContent = `${totalVotes} / ${TOTAL_TARGET_VOTERS}명`;
+        const progressPercent = Math.min(Math.round((currentVoterCount / TOTAL_TARGET_VOTERS) * 100), 100);
+        document.getElementById('progressStats').textContent = `${currentVoterCount} / ${TOTAL_TARGET_VOTERS}명`;
         document.getElementById('progressPercent').textContent = `(${progressPercent}%)`;
         document.getElementById('totalProgressBar').style.width = `${progressPercent}%`;
 
@@ -350,7 +361,7 @@
             rankingGrid.innerHTML = '';
             top3.forEach((item, index) => {
                 const rankNum = index + 1;
-                const percentage = totalVotes > 0 ? Math.round((item.votes / totalVotes) * 100) : 0;
+                const percentage = currentVoterCount > 0 ? Math.round((item.votes / currentVoterCount) * 100) : 0;
                 const rankLabels = ["🥇 1위", "🥈 2위", "🥉 3위"];
                 const deptClass = getDeptClass(item.team);
 
@@ -375,16 +386,18 @@
         cardGrid.innerHTML = '';
 
         list.forEach(c => {
-            const percentage = totalVotes > 0 ? Math.round((c.votes / totalVotes) * 100) : 0;
+            const isSelected = selectedIds.includes(c.id);
+            const percentage = currentVoterCount > 0 ? Math.round((c.votes / currentVoterCount) * 100) : 0;
             const deptClass = getDeptClass(c.team);
             const card = document.createElement('div');
-            card.className = `candidate-card ${selectedId === c.id ? 'selected' : ''}`;
+            card.className = `candidate-card ${isSelected ? 'selected' : ''}`;
             
             if (!hasVoted) {
                 card.onclick = () => selectCard(c.id);
             }
 
             card.innerHTML = `
+                <span class="select-check-badge">✓ 선택됨</span>
                 <div class="img-container">
                     <button class="zoom-btn" onclick="openModal('${c.image}', '${c.name}'); event.stopPropagation();" title="확대보기">🔍</button>
                     <img src="${c.image}" alt="${c.name}" onerror="if (this.src.endsWith('.jpg')) { this.src='./${c.name}.png'; } else { this.parentElement.innerHTML='<button class=\\'zoom-btn\\' onclick=\\'event.stopPropagation();\\'>🔍</button><span style=\\'font-weight:bold;color:#94a3b8;font-size:12px;\\'>${c.name}</span>'; }">
@@ -411,43 +424,65 @@
             votedNotice.style.display = 'block';
         } else {
             votedNotice.style.display = 'none';
-            if (selectedId) {
-                const target = list.find(c => c.id === selectedId);
-                voteBtn.disabled = false;
-                voteBtn.textContent = `[${target.name}] 님에게 투표하기`;
-            } else {
+            if (selectedIds.length === 0) {
                 voteBtn.disabled = true;
-                voteBtn.textContent = "후보를 선택해 주세요";
+                voteBtn.textContent = "후보 2명을 선택해 주세요 (0/2)";
+            } else if (selectedIds.length === 1) {
+                voteBtn.disabled = false;
+                const target1 = list.find(c => c.id === selectedIds[0]);
+                voteBtn.textContent = `[${target1.name}] 1명 선택됨 (1/2명 투표 가능)`;
+            } else if (selectedIds.length === 2) {
+                voteBtn.disabled = false;
+                const target1 = list.find(c => c.id === selectedIds[0]);
+                const target2 = list.find(c => c.id === selectedIds[1]);
+                voteBtn.textContent = `[${target1.name}, ${target2.name}] 2명 투표하기`;
             }
         }
     }
 
     function selectCard(id) {
         if (checkHasVoted()) return;
-        selectedId = id;
+
+        const index = selectedIds.indexOf(id);
+        if (index > -1) {
+            // 이미 선택된 상태면 해제
+            selectedIds.splice(index, 1);
+        } else {
+            // 최대 2개까지만 선택 허용
+            if (selectedIds.length >= MAX_SELECTION) {
+                alert("투표는 최대 2명까지만 선택할 수 있습니다.");
+                return;
+            }
+            selectedIds.push(id);
+        }
         renderView();
     }
 
     function handleVote() {
-        if (!selectedId || checkHasVoted()) return;
+        if (selectedIds.length === 0 || checkHasVoted()) return;
 
         const list = getStorageData();
-        const target = list.find(c => c.id === selectedId);
-        if (target) {
-            target.votes += 1;
-            
-            const deviceId = getDeviceId();
-            const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-            votedDevices.push(deviceId);
-            
-            localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
-            localStorage.setItem('workshop_vote_candidates_v15', JSON.stringify(list));
-            localStorage.setItem('workshop_vote_done_v15', 'true');
-            
-            selectedId = null;
-            renderView();
-            alert('투표가 정상적으로 완료되었습니다!');
-        }
+        const selectedNames = [];
+
+        selectedIds.forEach(id => {
+            const target = list.find(c => c.id === id);
+            if (target) {
+                target.votes += 1;
+                selectedNames.push(target.name);
+            }
+        });
+
+        const deviceId = getDeviceId();
+        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
+        votedDevices.push(deviceId);
+        
+        localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
+        localStorage.setItem('workshop_vote_candidates_v16', JSON.stringify(list));
+        localStorage.setItem('workshop_vote_done_v16', 'true');
+        
+        selectedIds = [];
+        renderView();
+        alert(`[${selectedNames.join(', ')}] 님에게 투표가 정상적으로 완료되었습니다!`);
     }
 
     function toggleAdminMode() {
@@ -470,10 +505,10 @@
         const inputPw = prompt("데이터를 초기화하려면 관리자 비밀번호를 입력하세요:");
         if (inputPw === ADMIN_PASSWORD) {
             if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                localStorage.removeItem('workshop_vote_candidates_v15');
-                localStorage.removeItem('workshop_vote_done_v15');
+                localStorage.removeItem('workshop_vote_candidates_v16');
+                localStorage.removeItem('workshop_vote_done_v16');
                 localStorage.removeItem('workshop_voted_devices');
-                selectedId = null;
+                selectedIds = [];
                 isAdminMode = false;
                 renderView();
                 alert("초기화되었습니다.");
