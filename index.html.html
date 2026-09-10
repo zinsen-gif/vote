@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>인생그래프 베스트 투표</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Pretendard Variable", Pretendard, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f8fafc; color: #0f172a; min-height: 100vh; padding: 20px 12px 100px; display: flex; flex-direction: column; align-items: center; }
+
+        .header-area { text-align: center; width: 100%; max-width: 600px; margin-bottom: 20px; }
+        .header-area h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+        .header-area p { font-size: 13px; color: #64748b; word-break: keep-all; }
+
+        .admin-dashboard-header {
+            display: none; background: #0f172a; color: #38bdf8; padding: 10px 16px;
+            border-radius: 10px; margin-top: 12px; font-size: 13px; font-weight: 700;
+        }
+
+        .card-grid {
+            width: 100%; max-width: 800px; display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px; margin-bottom: 20px;
+        }
+
+        @media (min-width: 600px) {
+            .card-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+        }
+
+        .candidate-card {
+            background: #ffffff; border-radius: 16px; border: 2px solid #e2e8f0;
+            overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer;
+            transition: all 0.2s ease; display: flex; flex-direction: column; position: relative;
+        }
+
+        .candidate-card:active { transform: scale(0.98); }
+        .candidate-card.selected { border-color: #2563eb; background-color: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
+
+        .img-container {
+            width: 100%; aspect-ratio: 4 / 3; background-color: #f1f5f9; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .img-container img { width: 100%; height: 100%; object-fit: cover; }
+
+        .card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+        .name-row { display: flex; justify-content: space-between; align-items: center; }
+        .name { font-size: 15px; font-weight: 700; color: #0f172a; }
+        
+        .votes-info { font-size: 12px; font-weight: 700; color: #2563eb; display: none; }
+        .progress-track { width: 100%; height: 5px; background: #e2e8f0; border-radius: 999px; overflow: hidden; display: none; margin-top: 3px; }
+        .progress-bar { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
+
+        .bottom-action {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
+            padding: 12px 16px 20px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+            z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
+
+        .btn-vote {
+            width: 100%; max-width: 500px; padding: 15px; background: #2563eb; color: #ffffff;
+            font-size: 16px; font-weight: 700; border: none; border-radius: 12px;
+            cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); transition: all 0.2s;
+        }
+
+        .btn-vote:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+
+        .voted-notice {
+            font-size: 12px; color: #dc2626; font-weight: 700; background: #fef2f2;
+            padding: 5px 12px; border-radius: 6px; display: none;
+        }
+
+        .admin-controls { display: flex; gap: 12px; }
+        .admin-btn { font-size: 11px; color: #94a3b8; background: none; border: none; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="header-area">
+        <h1>🎨 인생그래프 베스트 투표</h1>
+        <p>인생그래프를 확인한 후, 가장 인상 깊은 1명에게 투표해 주세요! (기기당 1회)</p>
+        <div class="admin-dashboard-header" id="adminHeader">🔒 관리자 모드: 실시간 집계 현황 공개 중</div>
+    </div>
+
+    <div class="card-grid" id="cardGrid"></div>
+
+    <div class="bottom-action">
+        <div class="voted-notice" id="votedNotice">이 기기에서는 이미 투표를 완료하셨습니다.</div>
+        <button class="btn-vote" id="voteButton" onclick="handleVote()" disabled>후보를 선택해 주세요</button>
+        
+        <div class="admin-controls">
+            <button class="admin-btn" onclick="toggleAdminMode()">관리자 결과 보기</button>
+            <button class="admin-btn" onclick="resetAllData()">데이터 초기화</button>
+        </div>
+    </div>
+
+<script>
+    // 관리자 비밀번호 변경 완료: 1001
+    const ADMIN_PASSWORD = "1001";
+
+    const memberNames = [
+        "강민석", "권성현", "김리아", "김보민", "김예린", 
+        "김은아", "김재광", "김주연", "김채은", "김혜정", 
+        "김호균", "맹원영", "박민지", "박진선", "서지우", 
+        "이가연", "이민주", "이상원", "이슬비", "이정근", 
+        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영"
+    ].sort((a, b) => a.localeCompare(b, 'ko'));
+
+    let selectedId = null;
+    let isAdminMode = false;
+
+    function getDeviceId() {
+        let deviceId = localStorage.getItem('workshop_device_uuid');
+        if (!deviceId) {
+            deviceId = 'device_' + Math.random().toString(36).substring(2, 11) + Date.now();
+            localStorage.setItem('workshop_device_uuid', deviceId);
+        }
+        return deviceId;
+    }
+
+    function getStorageData() {
+        const saved = localStorage.getItem('workshop_vote_candidates_v10');
+        if (saved) return JSON.parse(saved);
+
+        return memberNames.map((name, idx) => ({
+            id: idx + 1,
+            name: name,
+            image: `./${name}.jpg`,
+            votes: 0
+        }));
+    }
+
+    function checkHasVoted() {
+        const deviceId = getDeviceId();
+        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
+        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v10') === 'true';
+    }
+
+    function renderView() {
+        const list = getStorageData();
+        const totalVotes = list.reduce((acc, curr) => acc + curr.votes, 0);
+        const cardGrid = document.getElementById('cardGrid');
+        const voteBtn = document.getElementById('voteButton');
+        const votedNotice = document.getElementById('votedNotice');
+        const adminHeader = document.getElementById('adminHeader');
+        const hasVoted = checkHasVoted();
+
+        adminHeader.style.display = isAdminMode ? 'block' : 'none';
+        cardGrid.innerHTML = '';
+
+        list.forEach(c => {
+            const percentage = totalVotes > 0 ? Math.round((c.votes / totalVotes) * 100) : 0;
+            const card = document.createElement('div');
+            card.className = `candidate-card ${selectedId === c.id ? 'selected' : ''}`;
+            
+            if (!hasVoted) {
+                card.onclick = () => selectCard(c.id);
+            }
+
+            card.innerHTML = `
+                <div class="img-container">
+                    <img src="${c.image}" alt="${c.name}" onerror="if (this.src.endsWith('.jpg')) { this.src='./${c.name}.png'; } else { this.parentElement.innerHTML='<span style=\\'font-weight:bold;color:#94a3b8;font-size:12px;\\'>${c.name}</span>'; }">
+                </div>
+                <div class="card-body">
+                    <div class="name-row">
+                        <span class="name">${c.name}</span>
+                        <span class="votes-info" style="display: ${isAdminMode ? 'inline' : 'none'}">${c.votes}표 (${percentage}%)</span>
+                    </div>
+                    <div class="progress-track" style="display: ${isAdminMode ? 'block' : 'none'}">
+                        <div class="progress-bar" style="width: ${percentage}%"></div>
+                    </div>
+                </div>
+            `;
+            cardGrid.appendChild(card);
+        });
+
+        if (hasVoted) {
+            voteBtn.disabled = true;
+            voteBtn.textContent = "투표 완료됨";
+            votedNotice.style.display = 'block';
+        } else {
+            votedNotice.style.display = 'none';
+            if (selectedId) {
+                const target = list.find(c => c.id === selectedId);
+                voteBtn.disabled = false;
+                voteBtn.textContent = `[${target.name}] 님에게 투표하기`;
+            } else {
+                voteBtn.disabled = true;
+                voteBtn.textContent = "후보를 선택해 주세요";
+            }
+        }
+    }
+
+    function selectCard(id) {
+        if (checkHasVoted()) return;
+        selectedId = id;
+        renderView();
+    }
+
+    function handleVote() {
+        if (!selectedId || checkHasVoted()) return;
+
+        const list = getStorageData();
+        const target = list.find(c => c.id === selectedId);
+        if (target) {
+            target.votes += 1;
+            
+            const deviceId = getDeviceId();
+            const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
+            votedDevices.push(deviceId);
+            
+            localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
+            localStorage.setItem('workshop_vote_candidates_v10', JSON.stringify(list));
+            localStorage.setItem('workshop_vote_done_v10', 'true');
+            
+            selectedId = null;
+            renderView();
+            alert('투표가 정상적으로 완료되었습니다!');
+        }
+    }
+
+    function toggleAdminMode() {
+        if (isAdminMode) {
+            isAdminMode = false;
+            renderView();
+            return;
+        }
+
+        const inputPw = prompt("관리자 비밀번호를 입력하세요:");
+        if (inputPw === ADMIN_PASSWORD) {
+            isAdminMode = true;
+            renderView();
+        } else if (inputPw !== null) {
+            alert("비밀번호가 올바르지 않습니다.");
+        }
+    }
+
+    function resetAllData() {
+        const inputPw = prompt("데이터를 초기화하려면 관리자 비밀번호를 입력하세요:");
+        if (inputPw === ADMIN_PASSWORD) {
+            if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
+                localStorage.removeItem('workshop_vote_candidates_v10');
+                localStorage.removeItem('workshop_vote_done_v10');
+                localStorage.removeItem('workshop_voted_devices');
+                selectedId = null;
+                isAdminMode = false;
+                renderView();
+                alert("초기화되었습니다.");
+            }
+        } else if (inputPw !== null) {
+            alert("비밀번호가 올바르지 않습니다.");
+        }
+    }
+
+    renderView();
+</script>
+
+</body>
+</html>
