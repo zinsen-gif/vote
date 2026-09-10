@@ -182,16 +182,15 @@
 
 <script>
     const ADMIN_PASSWORD = "1001";
-    const TOTAL_TARGET_VOTERS = 28; // 총 투표 목표 인원수 (28명)
+    const TOTAL_TARGET_VOTERS = 28; // 총 투표 인원수 (28명)
 
-    // 참가자 총 28명 명단 (가나다순 정렬)
+    // 실제 참가자 28명 전체 명단 (가나다순 정렬)
     const memberNames = [
-        "강민석", "권성현", "김리아", "김보민", "김예린", 
+        "강민석", "권성현", "김리아", "김미희", "김보민", "김예린", 
         "김은아", "김재광", "김주연", "김채은", "김혜정", 
         "김호균", "맹원영", "박민지", "박진선", "서지우", 
-        "이가연", "이민주", "이상원", "이슬비", "이정근", 
-        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영",
-        "참가자27", "참가자28"
+        "이가연", "이민주", "이미연", "이상원", "이슬비", "이정근", 
+        "이하은", "정기흥", "주예진", "최우정", "윤수현", "홍주영"
     ].sort((a, b) => a.localeCompare(b, 'ko'));
 
     let selectedId = null;
@@ -207,7 +206,7 @@
     }
 
     function getStorageData() {
-        const saved = localStorage.getItem('workshop_vote_candidates_v12');
+        const saved = localStorage.getItem('workshop_vote_candidates_v14');
         if (saved) return JSON.parse(saved);
 
         return memberNames.map((name, idx) => ({
@@ -221,7 +220,7 @@
     function checkHasVoted() {
         const deviceId = getDeviceId();
         const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v12') === 'true';
+        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v14') === 'true';
     }
 
     function renderView() {
@@ -233,7 +232,7 @@
         const adminHeader = document.getElementById('adminHeader');
         const hasVoted = checkHasVoted();
 
-        // 최상단 진행률 UI 업데이트 (28명 기준 계산)
+        // 최상단 진행률 UI 업데이트 (28명 기준)
         const progressPercent = Math.min(Math.round((totalVotes / TOTAL_TARGET_VOTERS) * 100), 100);
         document.getElementById('progressStats').textContent = `${totalVotes} / ${TOTAL_TARGET_VOTERS}명`;
         document.getElementById('progressPercent').textContent = `(${progressPercent}%)`;
@@ -305,8 +304,8 @@
             votedDevices.push(deviceId);
             
             localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
-            localStorage.setItem('workshop_vote_candidates_v12', JSON.stringify(list));
-            localStorage.setItem('workshop_vote_done_v12', 'true');
+            localStorage.setItem('workshop_vote_candidates_v14', JSON.stringify(list));
+            localStorage.setItem('workshop_vote_done_v14', 'true');
             
             selectedId = null;
             renderView();
@@ -334,8 +333,8 @@
         const inputPw = prompt("데이터를 초기화하려면 관리자 비밀번호를 입력하세요:");
         if (inputPw === ADMIN_PASSWORD) {
             if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                localStorage.removeItem('workshop_vote_candidates_v12');
-                localStorage.removeItem('workshop_vote_done_v12');
+                localStorage.removeItem('workshop_vote_candidates_v14');
+                localStorage.removeItem('workshop_vote_done_v14');
                 localStorage.removeItem('workshop_voted_devices');
                 selectedId = null;
                 isAdminMode = false;
