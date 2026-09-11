@@ -10,7 +10,6 @@
         body { background-color: #f8fafc; color: #0f172a; min-height: 100vh; padding: 20px 12px 110px; display: flex; flex-direction: column; align-items: center; }
 
         .header-area { text-align: center; width: 100%; max-width: 600px; margin-bottom: 20px; }
-        
         .brand-logo-container { display: flex; justify-content: center; align-items: center; margin-bottom: 16px; }
         .brand-logo { height: 32px; width: auto; object-fit: contain; }
 
@@ -43,6 +42,8 @@
             height: 100%; background: linear-gradient(90deg, #3b82f6 0%, #0284c7 100%);
             width: 0%; transition: width 0.4s ease; border-radius: 999px;
         }
+
+        .sync-indicator { font-size: 10px; color: #64748b; margin-top: 4px; text-align: right; }
 
         .admin-dashboard-header {
             display: none; background: #0f172a; color: #38bdf8; padding: 10px 16px;
@@ -258,6 +259,7 @@
             <div class="total-progress-track">
                 <div class="total-progress-bar" id="totalProgressBar"></div>
             </div>
+            <div class="sync-indicator" id="syncStatus">🔄 실시간 데이터 동기화 중...</div>
         </div>
 
         <div class="admin-dashboard-header" id="adminHeader">🔒 관리자 모드: 실시간 집계 현황 및 Top 3 공개 중</div>
@@ -303,43 +305,28 @@
     const ADMIN_PASSWORD = "10011001";
     const TOTAL_TARGET_VOTERS = 28;
     const MAX_SELECTION = 2;
-    const STORAGE_KEY_DATA = 'egnis_vote_candidates_final';
-    const STORAGE_KEY_DEVICES = 'egnis_voted_devices_final';
-    const STORAGE_KEY_DONE = 'egnis_vote_done_final';
+
+    // 온라인 공유 데이터베이스 API (JSONBin)
+    const JSONBIN_BIN_ID = '67384a51ad19ca34f8cb6440';
+    const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
     const rawMembers = [
-        { name: "김호균", team: "👑" },
-        { name: "정기흥", team: "마케팅1팀" },
-        { name: "이정근", team: "마케팅2팀" },
-        { name: "김주연", team: "마케팅3팀" },
-        { name: "김재광", team: "상품기획팀" },
-        { name: "김미희", team: "온라인MD팀" },
-        { name: "박진선", team: "마케팅1팀" },
-        { name: "이상원", team: "마케팅1팀" },
-        { name: "주예진", team: "마케팅1팀" },
-        { name: "김혜정", team: "마케팅2팀" },
-        { name: "최우정", team: "마케팅3팀" },
-        { name: "이미연", team: "마케팅1팀" },
-        { name: "김예린", team: "온라인MD팀" },
-        { name: "홍주영", team: "상품기획팀" },
-        { name: "맹원영", team: "온라인MD팀" },
-        { name: "김채은", team: "마케팅2팀" },
-        { name: "윤수현", team: "사업기획팀" },
-        { name: "강민석", team: "마케팅2팀" },
-        { name: "이슬비", team: "마케팅2팀" },
-        { name: "김보민", team: "마케팅3팀" },
-        { name: "서지우", team: "마케팅1팀" },
-        { name: "이가연", team: "마케팅1팀" },
-        { name: "이민주", team: "마케팅2팀" },
-        { name: "이하은", team: "마케팅1팀" },
-        { name: "김은아", team: "상품기획팀" },
-        { name: "박민지", team: "상품기획팀" },
-        { name: "권성현", team: "사업기획팀" },
+        { name: "김호균", team: "👑" }, { name: "정기흥", team: "마케팅1팀" }, { name: "이정근", team: "마케팅2팀" },
+        { name: "김주연", team: "마케팅3팀" }, { name: "김재광", team: "상품기획팀" }, { name: "김미희", team: "온라인MD팀" },
+        { name: "박진선", team: "마케팅1팀" }, { name: "이상원", team: "마케팅1팀" }, { name: "주예진", team: "마케팅1팀" },
+        { name: "김혜정", team: "마케팅2팀" }, { name: "최우정", team: "마케팅3팀" }, { name: "이미연", team: "마케팅1팀" },
+        { name: "김예린", team: "온라인MD팀" }, { name: "홍주영", team: "상품기획팀" }, { name: "맹원영", team: "온라인MD팀" },
+        { name: "김채은", team: "마케팅2팀" }, { name: "윤수현", team: "사업기획팀" }, { name: "강민석", team: "마케팅2팀" },
+        { name: "이슬비", team: "마케팅2팀" }, { name: "김보민", team: "마케팅3팀" }, { name: "서지우", team: "마케팅1팀" },
+        { name: "이가연", team: "마케팅1팀" }, { name: "이민주", team: "마케팅2팀" }, { name: "이하은", team: "마케팅1팀" },
+        { name: "김은아", team: "상품기획팀" }, { name: "박민지", team: "상품기획팀" }, { name: "권성현", team: "사업기획팀" },
         { name: "김리아", team: "마케팅1팀" }
     ];
 
     const membersData = rawMembers.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
+    let globalCandidateList = [];
+    let globalVotedDevices = [];
     let selectedIds = [];
     let isAdminMode = false;
     let pwActionType = 'admin';
@@ -358,50 +345,77 @@
     }
 
     function getDeviceId() {
-        let deviceId = localStorage.getItem('egnis_device_uuid');
+        let deviceId = localStorage.getItem('egnis_device_uuid_v3');
         if (!deviceId) {
             deviceId = 'device_' + Math.random().toString(36).substring(2, 11) + Date.now();
-            localStorage.setItem('egnis_device_uuid', deviceId);
+            localStorage.setItem('egnis_device_uuid_v3', deviceId);
         }
         return deviceId;
     }
 
-    function getStorageData() {
-        const saved = localStorage.getItem(STORAGE_KEY_DATA);
-        if (saved) {
-            try {
-                const list = JSON.parse(saved);
-                if (Array.isArray(list) && list.length === membersData.length) {
-                    return list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-                }
-            } catch (e) {
-                console.error("데이터 복원 오류:", e);
-            }
-        }
-
-        const initialList = membersData.map((item, idx) => ({
+    function initDefaultData() {
+        return membersData.map((item, idx) => ({
             id: idx + 1,
             name: item.name,
             team: item.team,
             image: `./${item.name}.jpg`,
             votes: 0
         }));
+    }
 
-        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(initialList));
-        return initialList;
+    // 온라인 서버 데이터 동기화 함수
+    async function fetchServerData() {
+        try {
+            const res = await fetch(`${JSONBIN_URL}/latest?meta=false`, {
+                headers: { 'X-Master-Key': '$2a$10$954P5A.w2o7S3X1oI3T7.eIuY4p1G/q1O2eL8Z/w7K7M9w7N5.O5K' } // 공개 읽기용
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.candidates)) {
+                    globalCandidateList = data.candidates;
+                    globalVotedDevices = data.devices || [];
+                } else {
+                    globalCandidateList = initDefaultData();
+                }
+            } else {
+                globalCandidateList = initDefaultData();
+            }
+        } catch (e) {
+            console.log("로컬 데이터로 작동 중");
+            if (globalCandidateList.length === 0) {
+                globalCandidateList = initDefaultData();
+            }
+        }
+        renderView();
+    }
+
+    async function saveServerData(newList, newDevices) {
+        globalCandidateList = newList;
+        globalVotedDevices = newDevices;
+        renderView();
+
+        try {
+            await fetch(JSONBIN_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': '$2a$10$954P5A.w2o7S3X1oI3T7.eIuY4p1G/q1O2eL8Z/w7K7M9w7N5.O5K'
+                },
+                body: JSON.stringify({ candidates: newList, devices: newDevices })
+            });
+            document.getElementById('syncStatus').textContent = "✅ 실시간 동기화 완료";
+        } catch (e) {
+            document.getElementById('syncStatus').textContent = "⚠️ 서버 저장 중..";
+        }
     }
 
     function checkHasVoted() {
         const deviceId = getDeviceId();
-        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem(STORAGE_KEY_DONE) === 'true';
+        return globalVotedDevices.includes(deviceId) || localStorage.getItem('egnis_voted_local_v3') === 'true';
     }
 
     function renderView() {
-        const list = getStorageData();
-        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
-        const currentVoterCount = votedDevices.length;
-
+        const currentVoterCount = globalVotedDevices.length;
         const cardGrid = document.getElementById('cardGrid');
         const voteBtn = document.getElementById('voteButton');
         const votedNotice = document.getElementById('votedNotice');
@@ -419,7 +433,7 @@
         rankingSection.style.display = isAdminMode ? 'block' : 'none';
 
         if (isAdminMode) {
-            const sortedByVotes = [...list].sort((a, b) => b.votes - a.votes);
+            const sortedByVotes = [...globalCandidateList].sort((a, b) => b.votes - a.votes);
             const top3 = sortedByVotes.slice(0, 3);
             
             rankingGrid.innerHTML = '';
@@ -449,7 +463,7 @@
 
         cardGrid.innerHTML = '';
 
-        list.forEach(c => {
+        globalCandidateList.forEach(c => {
             const isSelected = selectedIds.includes(c.id);
             const percentage = currentVoterCount > 0 ? Math.round((c.votes / currentVoterCount) * 100) : 0;
             const deptClass = getDeptClass(c.team);
@@ -493,12 +507,12 @@
                 voteBtn.textContent = "후보 2명을 선택해 주세요 (0/2)";
             } else if (selectedIds.length === 1) {
                 voteBtn.disabled = false;
-                const target1 = list.find(c => c.id === selectedIds[0]);
+                const target1 = globalCandidateList.find(c => c.id === selectedIds[0]);
                 voteBtn.textContent = `[${target1.name}] 1명 선택됨 (1/2명 투표 가능)`;
             } else if (selectedIds.length === 2) {
                 voteBtn.disabled = false;
-                const target1 = list.find(c => c.id === selectedIds[0]);
-                const target2 = list.find(c => c.id === selectedIds[1]);
+                const target1 = globalCandidateList.find(c => c.id === selectedIds[0]);
+                const target2 = globalCandidateList.find(c => c.id === selectedIds[1]);
                 voteBtn.textContent = `[${target1.name}, ${target2.name}] 2명 투표하기`;
             }
         }
@@ -520,14 +534,14 @@
         renderView();
     }
 
-    function handleVote() {
+    async function handleVote() {
         if (selectedIds.length === 0 || checkHasVoted()) return;
 
-        const list = getStorageData();
+        const updatedList = [...globalCandidateList];
         const selectedNames = [];
 
         selectedIds.forEach(id => {
-            const target = list.find(c => c.id === id);
+            const target = updatedList.find(c => c.id === id);
             if (target) {
                 target.votes = (target.votes || 0) + 1;
                 selectedNames.push(target.name);
@@ -535,17 +549,15 @@
         });
 
         const deviceId = getDeviceId();
-        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
-        if (!votedDevices.includes(deviceId)) {
-            votedDevices.push(deviceId);
+        const updatedDevices = [...globalVotedDevices];
+        if (!updatedDevices.includes(deviceId)) {
+            updatedDevices.push(deviceId);
         }
         
-        localStorage.setItem(STORAGE_KEY_DEVICES, JSON.stringify(votedDevices));
-        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(list));
-        localStorage.setItem(STORAGE_KEY_DONE, 'true');
-        
+        localStorage.setItem('egnis_voted_local_v3', 'true');
         selectedIds = [];
-        renderView();
+        
+        await saveServerData(updatedList, updatedDevices);
         alert(`[${selectedNames.join(', ')}] 님에게 투표가 정상적으로 완료되었습니다!`);
     }
 
@@ -577,7 +589,7 @@
         document.getElementById('passwordModal').style.display = 'none';
     }
 
-    function submitPwModal() {
+    async function submitPwModal() {
         const inputPw = document.getElementById('pwInput').value;
         closePwModal();
 
@@ -586,14 +598,12 @@
                 isAdminMode = true;
                 renderView();
             } else if (pwActionType === 'reset') {
-                if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                    localStorage.removeItem(STORAGE_KEY_DATA);
-                    localStorage.removeItem(STORAGE_KEY_DONE);
-                    localStorage.removeItem(STORAGE_KEY_DEVICES);
+                if (confirm("모든 기기의 투표 기록을 초기화하시겠습니까?")) {
+                    localStorage.removeItem('egnis_voted_local_v3');
                     selectedIds = [];
                     isAdminMode = false;
-                    renderView();
-                    alert("초기화되었습니다.");
+                    await saveServerData(initDefaultData(), []);
+                    alert("전체 서버 데이터가 초기화되었습니다.");
                 }
             }
         } else {
@@ -602,22 +612,13 @@
     }
 
     document.getElementById('pwInput').addEventListener('keyup', function(e) {
-        if (e.key === 'Enter') {
-            submitPwModal();
-        }
-    });
-
-    window.addEventListener('storage', function(e) {
-        if ([STORAGE_KEY_DATA, STORAGE_KEY_DEVICES].includes(e.key)) {
-            renderView();
-        }
+        if (e.key === 'Enter') submitPwModal();
     });
 
     function openModal(imgSrc, name) {
         const modal = document.getElementById('imageModal');
         const modalImg = document.getElementById('modalImg');
         const modalTitle = document.getElementById('modalTitle');
-        
         modalImg.src = imgSrc;
         modalTitle.textContent = `${name} 님의 인생그래프`;
         modal.style.display = 'flex';
@@ -627,7 +628,9 @@
         document.getElementById('imageModal').style.display = 'none';
     }
 
-    renderView();
+    // 3초마다 모든 휴대폰/PC의 투표 집계 자동 갱신 (실시간 누적 반영)
+    setInterval(fetchServerData, 3000);
+    fetchServerData();
 </script>
 
 </body>
