@@ -43,7 +43,7 @@
             width: 0%; transition: width 0.4s ease; border-radius: 999px;
         }
 
-        .sync-indicator { font-size: 10px; color: #64748b; margin-top: 4px; text-align: right; }
+        .sync-indicator { font-size: 11px; color: #0284c7; margin-top: 6px; text-align: right; font-weight: 700; }
 
         .admin-dashboard-header {
             display: none; background: #0f172a; color: #38bdf8; padding: 10px 16px;
@@ -259,7 +259,7 @@
             <div class="total-progress-track">
                 <div class="total-progress-bar" id="totalProgressBar"></div>
             </div>
-            <div class="sync-indicator" id="syncStatus">🔄 실시간 데이터 동기화 중...</div>
+            <div class="sync-indicator" id="syncStatus">🟢 실시간 라이브 연동 중</div>
         </div>
 
         <div class="admin-dashboard-header" id="adminHeader">🔒 관리자 모드: 실시간 집계 현황 및 Top 3 공개 중</div>
@@ -301,14 +301,24 @@
         </div>
     </div>
 
+<!-- Firebase Realtime Database SDK (글로벌 실시간 서버 연동) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <script>
     const ADMIN_PASSWORD = "10011001";
     const TOTAL_TARGET_VOTERS = 28;
     const MAX_SELECTION = 2;
 
-    // 온라인 공유 데이터베이스 API (JSONBin)
-    const JSONBIN_BIN_ID = '67384a51ad19ca34f8cb6440';
-    const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+    // Firebase 파이어베이스 실시간 서버 설정
+    const firebaseConfig = {
+        databaseURL: "https://egnis-vote-workshop-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
 
     const rawMembers = [
         { name: "김호균", team: "👑" }, { name: "정기흥", team: "마케팅1팀" }, { name: "이정근", team: "마케팅2팀" },
@@ -345,10 +355,10 @@
     }
 
     function getDeviceId() {
-        let deviceId = localStorage.getItem('egnis_device_uuid_v3');
+        let deviceId = localStorage.getItem('egnis_device_uuid_v4');
         if (!deviceId) {
-            deviceId = 'device_' + Math.random().toString(36).substring(2, 11) + Date.now();
-            localStorage.setItem('egnis_device_uuid_v3', deviceId);
+            deviceId = 'dev_' + Math.random().toString(36).substring(2, 11) + Date.now();
+            localStorage.setItem('egnis_device_uuid_v4', deviceId);
         }
         return deviceId;
     }
@@ -363,55 +373,22 @@
         }));
     }
 
-    // 온라인 서버 데이터 동기화 함수
-    async function fetchServerData() {
-        try {
-            const res = await fetch(`${JSONBIN_URL}/latest?meta=false`, {
-                headers: { 'X-Master-Key': '$2a$10$954P5A.w2o7S3X1oI3T7.eIuY4p1G/q1O2eL8Z/w7K7M9w7N5.O5K' } // 공개 읽기용
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data && Array.isArray(data.candidates)) {
-                    globalCandidateList = data.candidates;
-                    globalVotedDevices = data.devices || [];
-                } else {
-                    globalCandidateList = initDefaultData();
-                }
-            } else {
-                globalCandidateList = initDefaultData();
-            }
-        } catch (e) {
-            console.log("로컬 데이터로 작동 중");
-            if (globalCandidateList.length === 0) {
-                globalCandidateList = initDefaultData();
-            }
+    // 서버 데이터를 누군가 변경하면(투표하면) 소켓으로 모든 스마트폰에 즉각 반영!
+    db.ref('workshop_vote_v1').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+            globalCandidateList = val.candidates || initDefaultData();
+            globalVotedDevices = val.devices || [];
+        } else {
+            globalCandidateList = initDefaultData();
+            globalVotedDevices = [];
         }
         renderView();
-    }
-
-    async function saveServerData(newList, newDevices) {
-        globalCandidateList = newList;
-        globalVotedDevices = newDevices;
-        renderView();
-
-        try {
-            await fetch(JSONBIN_URL, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': '$2a$10$954P5A.w2o7S3X1oI3T7.eIuY4p1G/q1O2eL8Z/w7K7M9w7N5.O5K'
-                },
-                body: JSON.stringify({ candidates: newList, devices: newDevices })
-            });
-            document.getElementById('syncStatus').textContent = "✅ 실시간 동기화 완료";
-        } catch (e) {
-            document.getElementById('syncStatus').textContent = "⚠️ 서버 저장 중..";
-        }
-    }
+    });
 
     function checkHasVoted() {
         const deviceId = getDeviceId();
-        return globalVotedDevices.includes(deviceId) || localStorage.getItem('egnis_voted_local_v3') === 'true';
+        return globalVotedDevices.includes(deviceId) || localStorage.getItem('egnis_voted_done_v4') === 'true';
     }
 
     function renderView() {
@@ -534,7 +511,7 @@
         renderView();
     }
 
-    async function handleVote() {
+    function handleVote() {
         if (selectedIds.length === 0 || checkHasVoted()) return;
 
         const updatedList = [...globalCandidateList];
@@ -553,11 +530,15 @@
         if (!updatedDevices.includes(deviceId)) {
             updatedDevices.push(deviceId);
         }
-        
-        localStorage.setItem('egnis_voted_local_v3', 'true');
+
+        // 실시간 구글 파이어베이스 데이터베이스 전송
+        db.ref('workshop_vote_v1').set({
+            candidates: updatedList,
+            devices: updatedDevices
+        });
+
+        localStorage.setItem('egnis_voted_done_v4', 'true');
         selectedIds = [];
-        
-        await saveServerData(updatedList, updatedDevices);
         alert(`[${selectedNames.join(', ')}] 님에게 투표가 정상적으로 완료되었습니다!`);
     }
 
@@ -589,7 +570,7 @@
         document.getElementById('passwordModal').style.display = 'none';
     }
 
-    async function submitPwModal() {
+    function submitPwModal() {
         const inputPw = document.getElementById('pwInput').value;
         closePwModal();
 
@@ -598,11 +579,14 @@
                 isAdminMode = true;
                 renderView();
             } else if (pwActionType === 'reset') {
-                if (confirm("모든 기기의 투표 기록을 초기화하시겠습니까?")) {
-                    localStorage.removeItem('egnis_voted_local_v3');
+                if (confirm("모든 기기의 투표 및 집계 기록을 완전 초기화하시겠습니까?")) {
+                    localStorage.removeItem('egnis_voted_done_v4');
+                    db.ref('workshop_vote_v1').set({
+                        candidates: initDefaultData(),
+                        devices: []
+                    });
                     selectedIds = [];
                     isAdminMode = false;
-                    await saveServerData(initDefaultData(), []);
                     alert("전체 서버 데이터가 초기화되었습니다.");
                 }
             }
@@ -627,10 +611,6 @@
     function closeModal() {
         document.getElementById('imageModal').style.display = 'none';
     }
-
-    // 3초마다 모든 휴대폰/PC의 투표 집계 자동 갱신 (실시간 누적 반영)
-    setInterval(fetchServerData, 3000);
-    fetchServerData();
 </script>
 
 </body>
