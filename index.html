@@ -135,7 +135,6 @@
         .name-wrapper { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .name { font-size: 15px; font-weight: 700; color: #0f172a; }
         
-        /* 뱃지 스타일 */
         .dept-badge {
             font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
             white-space: nowrap; display: inline-block;
@@ -304,8 +303,10 @@
     const ADMIN_PASSWORD = "10011001";
     const TOTAL_TARGET_VOTERS = 28;
     const MAX_SELECTION = 2;
+    const STORAGE_KEY_DATA = 'egnis_vote_candidates_final';
+    const STORAGE_KEY_DEVICES = 'egnis_voted_devices_final';
+    const STORAGE_KEY_DONE = 'egnis_vote_done_final';
 
-    // 김호균 님 부서 -> '👑'로 변경
     const rawMembers = [
         { name: "김호균", team: "👑" },
         { name: "정기흥", team: "마케팅1팀" },
@@ -357,40 +358,48 @@
     }
 
     function getDeviceId() {
-        let deviceId = localStorage.getItem('workshop_device_uuid');
+        let deviceId = localStorage.getItem('egnis_device_uuid');
         if (!deviceId) {
             deviceId = 'device_' + Math.random().toString(36).substring(2, 11) + Date.now();
-            localStorage.setItem('workshop_device_uuid', deviceId);
+            localStorage.setItem('egnis_device_uuid', deviceId);
         }
         return deviceId;
     }
 
     function getStorageData() {
-        const saved = localStorage.getItem('workshop_vote_candidates_v18');
+        const saved = localStorage.getItem(STORAGE_KEY_DATA);
         if (saved) {
-            const list = JSON.parse(saved);
-            return list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+            try {
+                const list = JSON.parse(saved);
+                if (Array.isArray(list) && list.length === membersData.length) {
+                    return list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                }
+            } catch (e) {
+                console.error("데이터 복원 오류:", e);
+            }
         }
 
-        return membersData.map((item, idx) => ({
+        const initialList = membersData.map((item, idx) => ({
             id: idx + 1,
             name: item.name,
             team: item.team,
             image: `./${item.name}.jpg`,
             votes: 0
         }));
+
+        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(initialList));
+        return initialList;
     }
 
     function checkHasVoted() {
         const deviceId = getDeviceId();
-        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        return votedDevices.includes(deviceId) || localStorage.getItem('workshop_vote_done_v18') === 'true';
+        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
+        return votedDevices.includes(deviceId) || localStorage.getItem(STORAGE_KEY_DONE) === 'true';
     }
 
     function renderView() {
         const list = getStorageData();
-        
-        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
+        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
         const currentVoterCount = votedDevices.length;
 
         const cardGrid = document.getElementById('cardGrid');
@@ -520,18 +529,20 @@
         selectedIds.forEach(id => {
             const target = list.find(c => c.id === id);
             if (target) {
-                target.votes += 1;
+                target.votes = (target.votes || 0) + 1;
                 selectedNames.push(target.name);
             }
         });
 
         const deviceId = getDeviceId();
-        const votedDevices = JSON.parse(localStorage.getItem('workshop_voted_devices') || '[]');
-        votedDevices.push(deviceId);
+        const votedDevices = JSON.parse(localStorage.getItem(STORAGE_KEY_DEVICES) || '[]');
+        if (!votedDevices.includes(deviceId)) {
+            votedDevices.push(deviceId);
+        }
         
-        localStorage.setItem('workshop_voted_devices', JSON.stringify(votedDevices));
-        localStorage.setItem('workshop_vote_candidates_v18', JSON.stringify(list));
-        localStorage.setItem('workshop_vote_done_v18', 'true');
+        localStorage.setItem(STORAGE_KEY_DEVICES, JSON.stringify(votedDevices));
+        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(list));
+        localStorage.setItem(STORAGE_KEY_DONE, 'true');
         
         selectedIds = [];
         renderView();
@@ -576,9 +587,9 @@
                 renderView();
             } else if (pwActionType === 'reset') {
                 if (confirm("모든 투표 기록을 초기화하시겠습니까?")) {
-                    localStorage.removeItem('workshop_vote_candidates_v18');
-                    localStorage.removeItem('workshop_vote_done_v18');
-                    localStorage.removeItem('workshop_voted_devices');
+                    localStorage.removeItem(STORAGE_KEY_DATA);
+                    localStorage.removeItem(STORAGE_KEY_DONE);
+                    localStorage.removeItem(STORAGE_KEY_DEVICES);
                     selectedIds = [];
                     isAdminMode = false;
                     renderView();
@@ -593,6 +604,12 @@
     document.getElementById('pwInput').addEventListener('keyup', function(e) {
         if (e.key === 'Enter') {
             submitPwModal();
+        }
+    });
+
+    window.addEventListener('storage', function(e) {
+        if ([STORAGE_KEY_DATA, STORAGE_KEY_DEVICES].includes(e.key)) {
+            renderView();
         }
     });
 
